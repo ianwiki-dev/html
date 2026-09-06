@@ -1,9 +1,1 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>
-<div style="font-size:24px;font-weight:bold;padding:20px">속도: <span id="s">0.0</span> km/h<br>오차: <span id="a">0.0</span>m <span id="m" style="color:red"></span></div>
-<script>
-navigator.geolocation.watchPosition(p => {
-    const c = p.coords; document.getElementById("a").innerText = c.accuracy.toFixed(1);
-    if (c.accuracy > 10) return document.getElementById("m").innerText = "(대기)";
-    document.getElementById("m").innerText = ""; document.getElementById("s").innerText = c.speed > 0 ? (c.speed * 3.6).toFixed(1) : "0.0";
-}, e => {}, { enableHighAccuracy: true });
-</script></body></html>
+<body id=s>0<script>navigator.geolocation.watchPosition(p=>s.innerHTML=(p.coords.speed*3.6).toFixed(1))</script>
