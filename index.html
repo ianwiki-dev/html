@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>심플 GPS 속도계</title>
+    <style>
+        body { text-align: center; font-family: sans-serif; background: #f0f0f0; padding-top: 50px; }
+        .speed-box { font-size: 80px; font-weight: bold; color: #00b4d8; margin: 20px 0; }
+        .unit { font-size: 24px; color: #666; }
+        .info { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <h2>현재 이동 속도</h2>
+    <!-- 속도가 표시될 공간 -->
+    <div class="speed-box"><span id="speed">0.0</span> <span class="unit">km/h</span></div>
+    <div class="info">GPS 정확도: <span id="accuracy">0</span>m</div>
+
+    <script>
+        // 사용자의 위치 변화를 실시간으로 감시하는 함수
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(function(position) {
+                
+                // 1. 브라우저가 준 기본 속도값 (단위: m/s)
+                let speedMS = position.coords.speed;
+                
+                // 2. 미터법 속도를 우리가 아는 km/h로 변환 (m/s * 3.6)
+                if (speedMS !== null && speedMS > 0) {
+                    let speedKMH = (speedMS * 3.6).toFixed(1); // 소수점 첫째자리까지
+                    document.getElementById("speed").innerText = speedKMH;
+                } else {
+                    document.getElementById("speed").innerText = "0.0";
+                }
+
+                // 3. 현재 GPS의 오차 범위 표시
+                let accuracy = position.coords.accuracy.toFixed(0);
+                document.getElementById("accuracy").innerText = accuracy;
+
+            }, function(error) {
+                alert("GPS 권한을 허용해주셔야 속도 측정이 가능합니다.");
+            }, {
+                enableHighAccuracy: true, // ⭐ 가장 중요: 높은 정확도 모드 켜기 (GPS 필수 사용)
+                maximumAge: 0,
+                timeout: 5000
+            });
+        } else {
+            alert("이 브라우저는 GPS를 지원하지 않습니다.");
+        }
+    </script>
+</body>
+</html>
