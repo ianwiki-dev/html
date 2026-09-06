@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>고정밀 실시간 지도 추적</title>
     <!-- 오픈소스 지도 라이브러리 Leaflet CSS 추가 -->
-    <link rel="stylesheet" href="https://unpkg.com" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: 'Malgun Gothic', sans-serif;
+            font-family: 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
@@ -16,38 +20,113 @@
             height: 100vh;
             background-color: #f0f4f8;
         }
+        
         #info-panel {
             background: white;
-            padding: 15px 20px;
+            padding: 12px 16px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            z-index: 1000; /* 지도가 위에 올라오지 않도록 정렬 */
-            display: flex;
-            justify-content: space-around;
+            z-index: 1000;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
             align-items: center;
-            flex-wrap: wrap;
         }
+        
         .status-badge {
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 20px;
             font-size: 14px;
             font-weight: bold;
             background-color: #6c757d;
             color: white;
+            text-align: center;
+            grid-column: 1 / -1;
         }
+        
         .tracking { background-color: #28a745; }
+        .waiting { background-color: #ffc107; color: #333; }
         .error { background-color: #dc3545; }
         
         .data-item {
-            font-size: 16px;
-            margin: 5px 15px;
+            font-size: 13px;
+            padding: 4px 8px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
-        .data-label { color: #666; font-size: 13px; margin-right: 5px;}
-        .data-value { font-weight: bold; color: #333; }
+        
+        .data-label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .data-value {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
 
-        /* 지도 영역 설정 (전체 화면의 남은 부분을 채움) */
         #map {
             flex: 1;
             width: 100%;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        #stopBtn {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        #stopBtn:hover {
+            background-color: #c82333;
+        }
+        
+        #stopBtn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        /* 모바일 반응형 */
+        @media (max-width: 600px) {
+            #info-panel {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 10px 12px;
+            }
+            
+            .status-badge {
+                grid-column: 1 / -1;
+            }
+            
+            .data-item {
+                font-size: 12px;
+            }
+            
+            .button-group {
+                grid-column: 1 / -1;
+                margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -55,18 +134,33 @@
 
 <!-- 상단 정보창 -->
 <div id="info-panel">
-    <div id="status" class="status-badge">GPS 연결 대기 중</div>
-    <div class="data-item"><span class="data-label">위도:</span><span id="lat" class="data-value">-</span></div>
-    <div class="data-item"><span class="data-label">경도:</span><span id="lon" class="data-value">-</span></div>
-    <div class="data-item"><span class="data-label">오차범위:</span><span id="accuracy" class="data-value">-</span></div>
-    <div class="data-item"><span class="data-label">속도:</span><span id="speed" class="data-value">-</span></div>
+    <div id="status" class="status-badge waiting">GPS 연결 대기 중</div>
+    <div class="data-item">
+        <span class="data-label">위도</span>
+        <span id="lat" class="data-value">-</span>
+    </div>
+    <div class="data-item">
+        <span class="data-label">경도</span>
+        <span id="lon" class="data-value">-</span>
+    </div>
+    <div class="data-item">
+        <span class="data-label">오차범위</span>
+        <span id="accuracy" class="data-value">-</span>
+    </div>
+    <div class="data-item">
+        <span class="data-label">속도</span>
+        <span id="speed" class="data-value">-</span>
+    </div>
+    <div class="button-group">
+        <button id="stopBtn" disabled>추적 중지</button>
+    </div>
 </div>
 
 <!-- 실시간 지도가 그려질 영역 -->
 <div id="map"></div>
 
 <!-- 오픈소스 지도 라이브러리 Leaflet JS 추가 -->
-<script src="https://unpkg.com"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // 고정밀 위치 서비스 옵션
 const geoOptions = {
@@ -77,19 +171,43 @@ const geoOptions = {
 
 let map, marker, circle;
 let isMapInitialized = false;
+let watchId = null;
+let isTracking = false;
 
 function startTracking() {
     const statusBadge = document.getElementById("status");
+    const stopBtn = document.getElementById("stopBtn");
 
     if (navigator.geolocation) {
         // 실시간으로 위치 변화를 감시 (걸어가거나 차를 타면 실시간 업데이트)
-        navigator.geolocation.watchPosition(updateLocation, showError, geoOptions);
+        watchId = navigator.geolocation.watchPosition(
+            updateLocation,
+            showError,
+            geoOptions
+        );
+        isTracking = true;
+        stopBtn.disabled = false;
         statusBadge.innerText = "실시간 위치 추적 중";
         statusBadge.className = "status-badge tracking";
     } else {
         statusBadge.innerText = "GPS 미지원 브라우저";
         statusBadge.className = "status-badge error";
     }
+}
+
+function stopTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+    
+    isTracking = false;
+    const statusBadge = document.getElementById("status");
+    const stopBtn = document.getElementById("stopBtn");
+    
+    statusBadge.innerText = "추적 중지됨";
+    statusBadge.className = "status-badge";
+    stopBtn.disabled = true;
 }
 
 function updateLocation(position) {
@@ -103,7 +221,8 @@ function updateLocation(position) {
     document.getElementById("lon").innerText = lon.toFixed(6);
     document.getElementById("accuracy").innerText = `±${accuracy.toFixed(1)}m`;
     
-    if (speed !== null && speed > 0) {
+    // 속도 안전하게 계산 (null, 음수 체크)
+    if (speed !== null && speed >= 0) {
         document.getElementById("speed").innerText = `${(speed * 3.6).toFixed(1)} km/h`;
     } else {
         document.getElementById("speed").innerText = "0.0 km/h";
@@ -116,14 +235,23 @@ function updateLocation(position) {
 
         // OpenStreetMap 타일 이미지(지도 그래픽) 로드
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+            maxZoom: 19
         }).addTo(map);
 
         // 내 위치를 나타낼 마커 추가
-        marker = L.marker([lat, lon]).addTo(map).bindPopup("<b>내가 지금 있는 곳!</b>").openPopup();
+        marker = L.marker([lat, lon], {
+            title: "내 위치"
+        }).addTo(map).bindPopup("<b>📍 내가 지금 있는 곳!</b>").openPopup();
         
         // 오차 범위를 보여주는 반경 원 추가
-        circle = L.circle([lat, lon], { radius: accuracy, color: '#007bff', opacity: 0.3 }).addTo(map);
+        circle = L.circle([lat, lon], {
+            radius: accuracy,
+            color: '#007bff',
+            fillColor: '#0d6efd',
+            fillOpacity: 0.2,
+            weight: 2
+        }).addTo(map);
 
         isMapInitialized = true;
     } else {
@@ -142,25 +270,31 @@ function showError(error) {
     const statusBadge = document.getElementById("status");
     statusBadge.className = "status-badge error";
     
+    let message = "오류 발생";
+    
     switch(error.code) {
         case error.PERMISSION_DENIED:
-            statusBadge.innerText = "권한 거부됨";
+            message = "위치 권한 거부됨";
             alert("상단 주소창 옆의 자물쇠 아이콘을 눌러 위치 권한을 '허용'해 주세요.");
             break;
         case error.POSITION_UNAVAILABLE:
-            statusBadge.innerText = "위치 확인 불가";
+            message = "위치 확인 불가";
             break;
         case error.TIMEOUT:
-            statusBadge.innerText = "요청 시간 초과";
+            message = "요청 시간 초과";
             break;
         default:
-            statusBadge.innerText = "오류 발생";
-            break;
+            message = "알 수 없는 오류";
     }
+    
+    statusBadge.innerText = message;
 }
 
+// 이벤트 리스너
+document.getElementById("stopBtn").addEventListener("click", stopTracking);
+
 // 웹페이지 로드 시 즉시 실행
-window.onload = startTracking;
+window.addEventListener("load", startTracking);
 </script>
 
 </body>
